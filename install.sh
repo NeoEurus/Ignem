@@ -16,8 +16,8 @@ python3 -m pip install --upgrade pip
 
 echo "Instalando dependencias..."
 python3 -m pip install -r requirements.txt
-chmod +x ignem.py
-sed -i 's/\r$//' ignem.py
+sudo cp ignem /usr/local/bin/
+sudio cp core /usr/local/bin/
 
 echo ""
 echo "✅ Instalación completada."
@@ -25,4 +25,4 @@ echo ""
 echo "Ejecuta Ignem con:"
 echo "python3 ignem.py --help"
 echo "O"
-echo "./ignem.py --help"
+echo "ignem --help"
