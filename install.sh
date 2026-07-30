@@ -17,7 +17,7 @@ python3 -m pip install --upgrade pip
 echo "Instalando dependencias..."
 python3 -m pip install -r requirements.txt
 sudo cp ignem /usr/local/bin/
-sudio cp core /usr/local/bin/
+sudo cp core /usr/local/bin/
 
 echo ""
 echo "✅ Instalación completada."
