@@ -1,158 +1,134 @@
-#!/usr/bin/env python3
+#!/bin/bash
 
-"""
-Proyecto Maqueta - Ignem v0.6
-Este proyecto es un escáner de puertos TCP/UDP simple desarrollado en Python 3.
-Hecho por Eurus (@eurushanma) y distribuido bajo la licencia MIT.
-"""
+VERSION="1.0"
 
-import argparse
-import os
-import sys
-from typing import Callable
+echo "Instalando Ignem v${VERSION}"
+echo "=========================="
+echo ""
 
-from colorama import Fore, Style, init
+if ! command -v python3 &> /dev/null
+then
+    echo "Python3 no está instalado."
 
-from core.scanner import Scanner, print_results, print_summary
+    if [ -n "$TERMUX_VERSION" ]; then
+        echo "Puedes instalarlo con:"
+        echo "pkg install python"
+    fi
 
-init(autoreset=True)
+    exit 1
+fi
 
-VERSION = "1.0"
+echo "Python3 encontrado: $(python3 --version)"
+echo ""
 
-BANNER = f"""
-{Fore.LIGHTYELLOW_EX}{Style.BRIGHT}
-    ██╗ ██████╗ ███╗   ██╗███████╗███╗   ███╗
-    ██║██╔════╝ ████╗  ██║██╔════╝████╗ ████║
-    ██║██║  ███╗██╔██╗ ██║█████╗  ██╔████╔██║
-    ██║██║   ██║██║╚██╗██║██╔══╝  ██║╚██╔╝██║
-    ██║╚██████╔╝██║ ╚████║███████╗██║ ╚═╝ ██║
-    ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚══════╝╚═╝     ╚═╝
-{Style.RESET_ALL}{Fore.LIGHTCYAN_EX}           Port Scanner  ·  v{VERSION}
-{Style.RESET_ALL}
-"""
+if [ -n "$TERMUX_VERSION" ]; then
+    TERMUX=true
+    INSTALL_DIR="$PREFIX/bin"
 
-clear: Callable[[], None] = lambda: os.system(
-    "cls" if os.name == "nt" else "clear"
-)
+    echo "Entorno detectado: Termux"
+    echo "Directorio de instalación: $INSTALL_DIR"
+else
+    TERMUX=false
+    INSTALL_DIR="/usr/local/bin"
 
+    echo "Entorno detectado: Linux"
+    echo "Directorio de instalación: $INSTALL_DIR"
+fi
 
-def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        prog="ignem",
-        description=BANNER + f"""
-{Fore.LIGHTWHITE_EX}{Style.BRIGHT}
-USO{Style.RESET_ALL}
-  ignem <TARGET> [OPCIONES]
+echo ""
 
-{Fore.LIGHTWHITE_EX}{Style.BRIGHT}
-OPCIONES{Style.RESET_ALL}
-  --tcp              Escanea únicamente puertos TCP.
-  --udp              Escanea únicamente puertos UDP.
-  --version          Muestra la versión del programa.
-  -h, --help         Muestra esta ayuda.
+echo "¿Quieres instalar colorama?"
+echo ""
+echo "1) Sí"
+echo "2) No"
+echo ""
 
-{Fore.LIGHTWHITE_EX}{Style.BRIGHT}
-PROTOCOLO POR DEFECTO{Style.RESET_ALL}
-  Si no se especifica --tcp ni --udp,
-  Ignem escanea TCP y UDP automáticamente.
+read -p "Selecciona una opción [1/2]: " COLORAMA_OPTION
 
-{Fore.LIGHTWHITE_EX}{Style.BRIGHT}
-EJEMPLOS{Style.RESET_ALL}
-  ignem scanme.nmap.org
-  ignem localhost --tcp
-  ignem 192.168.1.1 --udp
-  ignem 192.168.1.1 --tcp --udp
-""",
-        formatter_class=argparse.RawTextHelpFormatter,
-        add_help=False,
-    )
+case "$COLORAMA_OPTION" in
+    1)
+        echo ""
+        echo "Instalando colorama..."
 
-    parser.add_argument(
-        "target",
-        metavar="TARGET",
-        nargs="?",
-        help="IP o hostname a escanear",
-    )
+        if python3 -m pip install colorama
+        then
+            echo "Colorama instalado correctamente."
+        else
+            echo "No se pudo instalar colorama."
+            echo "Ignem utilizará los colores ANSI incorporados."
+        fi
+        ;;
 
-    parser.add_argument(
-        "--tcp",
-        action="store_true",
-        help="Escanea únicamente puertos TCP",
-    )
+    2)
+        echo ""
+        echo "Se omitirá la instalación de colorama."
+        echo "Ignem utilizará los colores ANSI incorporados."
+        ;;
 
-    parser.add_argument(
-        "--udp",
-        action="store_true",
-        help="Escanea únicamente puertos UDP",
-    )
+    *)
+        echo ""
+        echo "Opción no válida."
+        echo "Se omitirá la instalación de colorama."
+        ;;
+esac
 
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"Ignem v{VERSION}",
-    )
+echo ""
 
-    parser.add_argument(
-        "-h",
-        "--help",
-        action="help",
-        help="Muestra esta ayuda y sale",
-    )
+if [ ! -f "ignem.py" ]; then
+    echo "No se encontró ignem.py."
+    exit 1
+fi
 
-    args = parser.parse_args()
+chmod +x ignem.py
 
-    if args.target is None:
-        parser.print_help()
-        sys.exit(0)
+cat > ignem << EOF
+#!/bin/sh
+exec python3 "$(pwd)/ignem.py" "\$@"
+EOF
 
-    return args
+chmod +x ignem
 
+echo "Lanzador creado."
+echo ""
 
-def main() -> None:
-    args = parse_arguments()
+if [ "$TERMUX" = true ]; then
 
-    clear()
-    print(BANNER)
+    cp ignem "$INSTALL_DIR/ignem"
 
-    if args.tcp:
-        modes = [False]
-    elif args.udp:
-        modes = [True]
-    else:
-        modes = [False, True]
+    if [ $? -ne 0 ]; then
+        echo "No se pudo instalar Ignem en $INSTALL_DIR."
+        exit 1
+    fi
 
-    results = []
+else
 
-    for udp in modes:
-        scanner = Scanner(
-            args.target,
-            udp,
-        )
+    if [ ! -w "$INSTALL_DIR" ]; then
+        sudo cp ignem "$INSTALL_DIR/ignem"
+    else
+        cp ignem "$INSTALL_DIR/ignem"
+    fi
 
-        results.extend(
-            scanner.scan()
-        )
+    if [ $? -ne 0 ]; then
+        echo "No se pudo instalar Ignem."
+        exit 1
+    fi
 
-    print_results(results)
-    print_summary(results)
+fi
 
-
-if __name__ == "__main__":
-    try:
-        main()
-
-    except KeyboardInterrupt:
-        print(
-            f"\n{Fore.LIGHTRED_EX}{Style.BRIGHT}"
-            "Escaneo interrumpido por el usuario."
-            f"{Style.RESET_ALL}\n"
-        )
-        sys.exit(130)
-
-    except Exception as error:
-        print(
-            f"\n{Fore.LIGHTRED_EX}{Style.BRIGHT}"
-            f"Error: {error}"
-            f"{Style.RESET_ALL}\n"
-        )
-        sys.exit(1)
+echo ""
+echo "=========================="
+echo "Ignem v${VERSION} instalado."
+echo "=========================="
+echo ""
+echo "Ejecuta:"
+echo ""
+echo "  ignem"
+echo ""
+echo "Ayuda:"
+echo ""
+echo "  ignem --help"
+echo ""
+echo "Versión:"
+echo ""
+echo "  ignem --version"
+echo ""
