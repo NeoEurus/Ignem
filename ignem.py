@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 """
-Proyecto Maqueta - Ignem v0.6
-Este proyecto es un escáner de puertos TCP/UDP simple desarrollado en Python 3
+Proyecto - Ignem v1.0
+Este proyecto es un escáner de puertos TCP/UDP simple desarrollado en Python 3.
 Hecho por Eurus (@eurushanma) y distribuido bajo la licencia MIT.
 """
 
@@ -13,9 +13,11 @@ from typing import Callable
 
 from colorama import Fore, Style, init
 
-from core.scanner import Scanner
+from core.scanner import Scanner, print_results, print_summary
 
 init(autoreset=True)
+
+VERSION = "1.0"
 
 BANNER = f"""
 {Fore.LIGHTYELLOW_EX}{Style.BRIGHT}
@@ -25,7 +27,7 @@ BANNER = f"""
     ██║██║   ██║██║╚██╗██║██╔══╝  ██║╚██╔╝██║
     ██║╚██████╔╝██║ ╚████║███████╗██║ ╚═╝ ██║
     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚══════╝╚═╝     ╚═╝
-{Style.RESET_ALL}{Fore.LIGHTCYAN_EX}           Port Scanner  ·  v0.6
+{Style.RESET_ALL}{Fore.LIGHTCYAN_EX}           Port Scanner  ·  v{VERSION}
 {Style.RESET_ALL}
 """
 
@@ -38,17 +40,24 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="ignem",
         description=BANNER + f"""
-
-{Fore.LIGHTWHITE_EX}{Style.BRIGHT}USO{Style.RESET_ALL}
+{Fore.LIGHTWHITE_EX}{Style.BRIGHT}
+USO{Style.RESET_ALL}
   ignem <TARGET> [OPCIONES]
 
-{Fore.LIGHTWHITE_EX}{Style.BRIGHT}OPCIONES{Style.RESET_ALL}
+{Fore.LIGHTWHITE_EX}{Style.BRIGHT}
+OPCIONES{Style.RESET_ALL}
   --tcp              Escanea únicamente puertos TCP.
   --udp              Escanea únicamente puertos UDP.
   --version          Muestra la versión del programa.
   -h, --help         Muestra esta ayuda.
 
-{Fore.LIGHTWHITE_EX}{Style.BRIGHT}EJEMPLOS{Style.RESET_ALL}
+{Fore.LIGHTWHITE_EX}{Style.BRIGHT}
+PROTOCOLO POR DEFECTO{Style.RESET_ALL}
+  Si no se especifica --tcp ni --udp,
+  Ignem escanea TCP y UDP automáticamente.
+
+{Fore.LIGHTWHITE_EX}{Style.BRIGHT}
+EJEMPLOS{Style.RESET_ALL}
   ignem scanme.nmap.org
   ignem localhost --tcp
   ignem 192.168.1.1 --udp
@@ -61,6 +70,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "target",
         metavar="TARGET",
+        nargs="?",
         help="IP o hostname a escanear",
     )
 
@@ -79,7 +89,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--version",
         action="version",
-        version="Ignem v0.6",
+        version=f"Ignem v{VERSION}",
     )
 
     parser.add_argument(
@@ -89,11 +99,13 @@ def parse_arguments() -> argparse.Namespace:
         help="Muestra esta ayuda y sale",
     )
 
-    if len(sys.argv) == 1:
+    args = parser.parse_args()
+
+    if args.target is None:
         parser.print_help()
         sys.exit(0)
 
-    return parser.parse_args()
+    return args
 
 
 def main() -> None:
@@ -102,21 +114,33 @@ def main() -> None:
     clear()
     print(BANNER)
 
-    modes = []
+    if args.tcp:
+        modes = [False]
+    elif args.udp:
+        modes = [True]
+    else:
+        modes = [False, True]
 
-    if args.tcp or (not args.tcp and not args.udp):
-        modes.append(False)
-
-    if args.udp or (not args.tcp and not args.udp):
-        modes.append(True)
+    results = []
 
     for udp in modes:
-        Scanner(args.target, udp).scan()
+        scanner = Scanner(
+            args.target,
+            udp,
+        )
+
+        results.extend(
+            scanner.scan()
+        )
+
+    print_results(results)
+    print_summary(results)
 
 
 if __name__ == "__main__":
     try:
         main()
+
     except KeyboardInterrupt:
         print(
             f"\n{Fore.LIGHTRED_EX}{Style.BRIGHT}"
@@ -124,6 +148,7 @@ if __name__ == "__main__":
             f"{Style.RESET_ALL}\n"
         )
         sys.exit(130)
+
     except Exception as error:
         print(
             f"\n{Fore.LIGHTRED_EX}{Style.BRIGHT}"
