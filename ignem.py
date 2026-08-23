@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Proyecto - Ignem v1.0
+Proyecto Maqueta - Ignem v0.6
 Este proyecto es un escáner de puertos TCP/UDP simple desarrollado en Python 3.
 Hecho por Eurus (@eurushanma) y distribuido bajo la licencia MIT.
 """
@@ -11,11 +11,21 @@ import os
 import sys
 from typing import Callable
 
-from colorama import Fore, Style, init
+try:
+    from colorama import Fore, Style
+except ImportError:
+    class Fore:
+        LIGHTGREEN_EX = "\033[92m"
+        LIGHTYELLOW_EX = "\033[93m"
+        LIGHTCYAN_EX = "\033[96m"
+        LIGHTRED_EX = "\033[91m"
+        LIGHTWHITE_EX = "\033[97m"
+
+    class Style:
+        BRIGHT = "\033[1m"
+        RESET_ALL = "\033[0m"
 
 from core.scanner import Scanner, print_results, print_summary
-
-init(autoreset=True)
 
 VERSION = "1.0"
 
@@ -34,7 +44,6 @@ BANNER = f"""
 clear: Callable[[], None] = lambda: os.system(
     "cls" if os.name == "nt" else "clear"
 )
-
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -107,7 +116,6 @@ EJEMPLOS{Style.RESET_ALL}
 
     return args
 
-
 def main() -> None:
     args = parse_arguments()
 
@@ -135,7 +143,6 @@ def main() -> None:
 
     print_results(results)
     print_summary(results)
-
 
 if __name__ == "__main__":
     try:
