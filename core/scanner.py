@@ -5,7 +5,19 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Dict
 
-from colorama import Fore, Style
+try:
+    from colorama import Fore, Style
+except ImportError:
+    class Fore:
+        LIGHTGREEN_EX = "\033[92m"
+        LIGHTYELLOW_EX = "\033[93m"
+        LIGHTCYAN_EX = "\033[96m"
+        LIGHTRED_EX = "\033[91m"
+        LIGHTWHITE_EX = "\033[97m"
+
+    class Style:
+        BRIGHT = "\033[1m"
+        RESET_ALL = "\033[0m"
 
 
 COMMON_TCP: Dict[int, str] = {
@@ -14,27 +26,57 @@ COMMON_TCP: Dict[int, str] = {
     22: "SSH",
     23: "Telnet",
     25: "SMTP",
+    26: "SMTP-Alt",
     53: "DNS",
     80: "HTTP",
     110: "POP3",
     111: "RPCbind",
+    119: "NNTP",
     135: "MSRPC",
     139: "NetBIOS",
     143: "IMAP",
+    389: "LDAP",
     443: "HTTPS",
     445: "SMB",
+    465: "SMTPS",
+    587: "SMTP-Submission",
+    636: "LDAPS",
     993: "IMAPS",
     995: "POP3S",
     1433: "MSSQL",
     1521: "Oracle",
+    2049: "NFS",
+    2375: "Docker",
+    2376: "Docker-TLS",
+    3000: "Grafana/Node",
     3306: "MySQL",
     3389: "RDP",
+    4000: "Web-Alt",
+    5000: "HTTP-Alt",
     5432: "PostgreSQL",
+    5672: "AMQP",
     5900: "VNC",
+    5985: "WinRM",
+    5986: "WinRM-HTTPS",
     6379: "Redis",
+    6443: "Kubernetes-API",
+    8000: "HTTP-Alt",
+    8008: "HTTP-Alt",
     8080: "HTTP-Proxy",
+    8081: "HTTP-Alt",
+    8088: "HTTP-Alt",
     8443: "HTTPS-Alt",
+    8888: "HTTP-Alt",
+    9000: "PHP-FPM/Dev",
+    9090: "Prometheus",
+    9200: "Elasticsearch",
+    9300: "Elasticsearch",
+    10000: "Webmin",
+    11211: "Memcached",
+    15672: "RabbitMQ",
     27017: "MongoDB",
+    27018: "MongoDB",
+    50000: "SAP",
 }
 
 
@@ -51,9 +93,20 @@ COMMON_UDP: Dict[int, str] = {
     500: "ISAKMP",
     514: "Syslog",
     520: "RIP",
+    623: "IPMI",
+    1194: "OpenVPN",
+    1434: "MSSQL-Browser",
+    1701: "L2TP",
     1900: "SSDP",
     4500: "IPSec-NAT",
+    5060: "SIP",
+    5061: "SIP-TLS",
     5353: "mDNS",
+    5355: "LLMNR",
+    5683: "CoAP",
+    10000: "Webmin",
+    11211: "Memcached",
+    16100: "SNMP-Alt",
 }
 
 
@@ -63,13 +116,22 @@ DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 class Scanner:
-    def __init__(self, target: str, udp: bool = False) -> None:
+    def __init__(
+        self,
+        target: str,
+        udp: bool = False,
+    ) -> None:
         self.hostname = target
         self.target = socket.gethostbyname(target)
         self.udp = udp
+
+        self.protocol = "UDP" if udp else "TCP"
         self.ports = COMMON_UDP if udp else COMMON_TCP
 
-        self.open_ports: list[tuple[int, str]] = []
+        self.open_ports: list[
+            tuple[int, str, str]
+        ] = []
+
         self.lock = threading.Lock()
 
         self.completed = 0
@@ -84,14 +146,23 @@ class Scanner:
             )
 
             bar_length = 30
+
             filled = int(
-                (bar_length * self.completed) / self.total
+                (bar_length * self.completed)
+                / self.total
             )
 
-            bar = "█" * filled + "░" * (bar_length - filled)
+            bar = (
+                "█" * filled
+                + "░" * (bar_length - filled)
+            )
 
             print(
-                f"\r  Progreso: {bar} {percent:3d}%",
+                f"\r  {Fore.LIGHTCYAN_EX}"
+                f"Progreso: "
+                f"{bar} "
+                f"{percent:3d}%"
+                f"{Style.RESET_ALL}",
                 end="",
                 flush=True,
             )
@@ -101,22 +172,23 @@ class Scanner:
         port: int,
         service: str,
     ) -> None:
-
         try:
             with socket.socket(
                 socket.AF_INET,
                 socket.SOCK_STREAM,
             ) as sock:
-
                 sock.settimeout(TIMEOUT)
 
                 if sock.connect_ex(
                     (self.target, port)
                 ) == 0:
-
                     with self.lock:
                         self.open_ports.append(
-                            (port, service)
+                            (
+                                port,
+                                self.protocol,
+                                service,
+                            )
                         )
 
         except OSError:
@@ -130,13 +202,11 @@ class Scanner:
         port: int,
         service: str,
     ) -> None:
-
         try:
             with socket.socket(
                 socket.AF_INET,
                 socket.SOCK_DGRAM,
             ) as sock:
-
                 sock.settimeout(TIMEOUT)
 
                 sock.sendto(
@@ -149,7 +219,11 @@ class Scanner:
 
                     with self.lock:
                         self.open_ports.append(
-                            (port, service)
+                            (
+                                port,
+                                self.protocol,
+                                service,
+                            )
                         )
 
                 except socket.timeout:
@@ -161,51 +235,23 @@ class Scanner:
         finally:
             self._progress()
 
-    def _print_results(self) -> None:
-
-        print("\n")
-
-        print(
-            f"{Fore.LIGHTWHITE_EX}"
-            f"  {'PUERTO':<8} │ {'ESTADO':<10} │ SERVICIO"
-            f"{Style.RESET_ALL}"
-        )
-
-        print(
-            f"  {'─'*8}─┼─{'─'*10}─┼─{'─'*20}"
-        )
-
-        self.open_ports.sort(
-            key=lambda item: item[0]
-        )
-
-        for port, service in self.open_ports:
-
-            print(
-                f"  {Fore.LIGHTGREEN_EX}"
-                f"{port:<8}"
-                f"{Style.RESET_ALL}"
-                f" │ "
-                f"{Fore.LIGHTGREEN_EX}"
-                f"{'ABIERTO':<10}"
-                f"{Style.RESET_ALL}"
-                f" │ {service}"
-            )
-
-    def scan(self) -> None:
-
-        protocol = "UDP" if self.udp else "TCP"
+    def scan(
+        self,
+    ) -> list[tuple[int, str, str]]:
+        self.completed = 0
+        self.open_ports.clear()
 
         start = time.time()
 
         print(
             f"{Fore.LIGHTCYAN_EX}"
-            f"  Protocolo : {protocol}"
+            f"  Protocolo : {self.protocol}"
+            f"{Style.RESET_ALL}"
         )
 
         print(
-            f"  Objetivo  : {self.hostname}"
-            f" ({self.target})"
+            f"  Objetivo  : "
+            f"{self.hostname} ({self.target})"
         )
 
         print(
@@ -214,18 +260,19 @@ class Scanner:
 
         print(
             f"  Workers   : {MAX_WORKERS}"
-            f"{Style.RESET_ALL}\n"
+        )
+
+        print()
+
+        checker = (
+            self._check_udp
+            if self.udp
+            else self._check_tcp
         )
 
         with ThreadPoolExecutor(
             max_workers=MAX_WORKERS
         ) as executor:
-
-            checker = (
-                self._check_udp
-                if self.udp
-                else self._check_tcp
-            )
 
             futures = [
                 executor.submit(
@@ -237,42 +284,114 @@ class Scanner:
                 in self.ports.items()
             ]
 
-            for _ in as_completed(futures):
-                pass
+            for future in as_completed(futures):
+                future.result()
 
         elapsed = time.time() - start
 
-        self._print_results()
-
         print(
-            f"\n{Fore.LIGHTCYAN_EX}"
-            f"  ─────────────────────────────────────"
+            f"\n\n  "
+            f"{Fore.LIGHTGREEN_EX}"
+            f"✓ Escaneo {self.protocol} finalizado"
+            f"{Style.RESET_ALL}"
         )
-
-        if self.open_ports:
-            print(
-                f"  Encontrados "
-                f"{Fore.LIGHTGREEN_EX}"
-                f"{len(self.open_ports)}"
-                f"{Fore.LIGHTCYAN_EX}"
-                f" puerto(s) abierto(s)."
-            )
-        else:
-            print(
-                "  No se encontraron puertos abiertos."
-            )
 
         print(
             f"  Tiempo: {elapsed:.2f}s"
         )
 
+        return self.open_ports
+
+
+def print_results(
+    results: list[tuple[int, str, str]],
+) -> None:
+    results.sort(
+        key=lambda item: (
+            item[0],
+            item[1],
+        )
+    )
+
+    print()
+
+    print(
+        f"{Fore.LIGHTWHITE_EX}{Style.BRIGHT}"
+        f"  {'PUERTO':<9}│ "
+        f"{'PROTOCOLO':<11}│ "
+        f"{'ESTADO':<10}│ "
+        f"SERVICIO"
+        f"{Style.RESET_ALL}"
+    )
+
+    print(
+        f"  {'─' * 9}"
+        f"┼"
+        f"{'─' * 12}"
+        f"┼"
+        f"{'─' * 11}"
+        f"┼"
+        f"{'─' * 20}"
+    )
+
+    if not results:
         print(
-            f"  Finalizado: "
-            f"{datetime.now().strftime(DATE_FORMAT)}"
+            f"  {Fore.LIGHTYELLOW_EX}"
+            "No se encontraron puertos abiertos."
+            f"{Style.RESET_ALL}"
+        )
+        return
+
+    for port, protocol, service in results:
+        print(
+            f"  {Fore.LIGHTCYAN_EX}"
+            f"{port:<9}"
+            f"{Style.RESET_ALL}"
+            f"│ "
+            f"{Fore.LIGHTYELLOW_EX}"
+            f"{protocol:<11}"
+            f"{Style.RESET_ALL}"
+            f"│ "
+            f"{Fore.LIGHTGREEN_EX}"
+            f"{'ABIERTO':<10}"
+            f"{Style.RESET_ALL}"
+            f"│ {service}"
         )
 
+
+def print_summary(
+    results: list[tuple[int, str, str]],
+) -> None:
+    print()
+
+    print(
+        f"{Fore.LIGHTCYAN_EX}"
+        "  ─────────────────────────────────────────────"
+        f"{Style.RESET_ALL}"
+    )
+
+    if results:
         print(
-            f"{Fore.LIGHTCYAN_EX}"
-            f"  ─────────────────────────────────────"
-            f"{Style.RESET_ALL}\n"
+            f"  Encontrados "
+            f"{Fore.LIGHTGREEN_EX}"
+            f"{len(results)}"
+            f"{Style.RESET_ALL}"
+            f" puerto(s) abierto(s)."
         )
+    else:
+        print(
+            f"  {Fore.LIGHTYELLOW_EX}"
+            "No se encontraron puertos abiertos."
+            f"{Style.RESET_ALL}"
+        )
+
+    print(
+        f"  Finalizado: "
+        f"{datetime.now().strftime(DATE_FORMAT)}"
+    )
+
+    print(
+        f"{Fore.LIGHTCYAN_EX}"
+        "  ─────────────────────────────────────────────"
+        f"{Style.RESET_ALL}\n"
+    )
