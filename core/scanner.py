@@ -19,7 +19,6 @@ except ImportError:
         BRIGHT = "\033[1m"
         RESET_ALL = "\033[0m"
 
-
 COMMON_TCP: Dict[int, str] = {
     20: "FTP-Data",
     21: "FTP",
@@ -79,7 +78,6 @@ COMMON_TCP: Dict[int, str] = {
     50000: "SAP",
 }
 
-
 COMMON_UDP: Dict[int, str] = {
     53: "DNS",
     67: "DHCP",
@@ -109,11 +107,9 @@ COMMON_UDP: Dict[int, str] = {
     16100: "SNMP-Alt",
 }
 
-
 TIMEOUT = 1.0
 MAX_WORKERS = 100
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-
 
 class Scanner:
     def __init__(
