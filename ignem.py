@@ -111,7 +111,30 @@ EJEMPLOS{Style.RESET_ALL}
     args = parser.parse_args()
 
     if args.target is None:
-        parser.print_help()
+        print(BANNER + f"""
+{Fore.LIGHTWHITE_EX}{Style.BRIGHT}
+USO{Style.RESET_ALL}
+  ignem <TARGET> [OPCIONES]
+
+{Fore.LIGHTWHITE_EX}{Style.BRIGHT}
+OPCIONES{Style.RESET_ALL}
+  --tcp              Escanea únicamente puertos TCP.
+  --udp              Escanea únicamente puertos UDP.
+  --version          Muestra la versión del programa.
+  -h, --help         Muestra esta ayuda.
+
+{Fore.LIGHTWHITE_EX}{Style.BRIGHT}
+PROTOCOLO POR DEFECTO{Style.RESET_ALL}
+  Si no se especifica --tcp ni --udp,
+  Ignem escanea TCP y UDP automáticamente.
+
+{Fore.LIGHTWHITE_EX}{Style.BRIGHT}
+EJEMPLOS{Style.RESET_ALL}
+  ignem scanme.nmap.org
+  ignem localhost --tcp
+  ignem 192.168.1.1 --udp
+  ignem 192.168.1.1 --tcp --udp
+""")
         sys.exit(0)
 
     return args
